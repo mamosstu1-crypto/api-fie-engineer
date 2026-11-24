@@ -7260,6 +7260,7 @@ class ReportController extends Controller
             'insurances_renewals.date_end',
             'insurances_renewals.type',
             'insurances_renewals.amount_paid',
+            'vechicle_services_transactions.service_price',
             'insurances_renewals.policy_number',
             'insurances_renewals.policy_status',
             'insurances_renewals.insurance_renewal_type_id',
@@ -12349,11 +12350,7 @@ class ReportController extends Controller
         $costdata_cardit_income   = [];
         $costdata_cardit_expenses = [];
 
-        // Calculate total commission from inspections
-        $totalTax = 0;
-        foreach ($Inspections as $inspection) {
-            $totalTax += ($inspection->commission ?? 0) + ($inspection->paytrue ?? 0);
-        }
+        $totalTax = $this->sumCarTaxExpenseForDailyReport($startDate, $endDate, $branchId);
 
         if ($totalTax > 0) {
             $commissionExpense = [
@@ -12673,9 +12670,9 @@ class ReportController extends Controller
                     break;
             }
         }
-        $totalIncome = collect($cash)->sum('amount');
-        $totalExpense = collect($transfer)->sum('amount'); // จะเป็นค่าลบ
-        $netBalance = $totalIncome + $totalExpense;
+        $netBalance = collect($cash)->sum('amount')
+            + collect($transfer)->sum('amount')
+            + collect($credit)->sum('amount');
         // Summary totals
         $summaryData = [
             'start_date'     => $startDate->format('Y-m-d'),
@@ -13556,8 +13553,18 @@ class ReportController extends Controller
 
         $filteredLatest = $latestPerNo;
         $status         = strtolower(trim((string) $tax_vehicle));
+        $taxVehicleView = $tax_vehicle;
 
-        if (in_array($status, ['check', 'wait', 'send', 'complete', 'success'], true)) {
+        if (in_array($status, ['complete', 'success'], true)) {
+            $filteredLatest = $latestPerNo->filter(
+                fn ($ins) => in_array(
+                    strtolower(trim((string) ($ins->tax_vehicle ?? ''))),
+                    ['complete', 'success'],
+                    true
+                )
+            )->values();
+            $taxVehicleView = 'complete';
+        } elseif (in_array($status, ['check', 'wait', 'send'], true)) {
             $filteredLatest = $latestPerNo->filter(
                 fn ($ins) => strtolower(trim((string) ($ins->tax_vehicle ?? ''))) === $status
             )->values();
@@ -13569,18 +13576,56 @@ class ReportController extends Controller
         $excel_name = 'รายงานภาษีรถ.xlsx';
         if ($status === 'send') {
             $excel_name = 'รายงานภาษีรถ_รายการนำส่ง.xlsx';
-        } elseif ($status === 'complete') {
-            $excel_name = 'รายงานภาษีรถ_รอรับป้าย.xlsx';
-        } elseif ($status === 'success') {
-            $excel_name = 'รายงานภาษีรถ_สำเร็จ.xlsx';
+        } elseif (in_array($status, ['complete', 'success'], true)) {
+            $excel_name = 'รายงานภาษีรถ_รอรับป้ายและสำเร็จ.xlsx';
         }
 
         $sd_th = $start_date ? Carbon::parse($start_date)->format('d/m/') . (Carbon::parse($start_date)->year + 543) : null;
         $ed_th = $end_date ? Carbon::parse($end_date)->format('d/m/') . (Carbon::parse($end_date)->year + 543) : null;
 
-        $result = new ReportCarTaxVehicleExport($exportData, $tax_vehicle, $sd_th, $ed_th);
+        $result = new ReportCarTaxVehicleExport($exportData, $taxVehicleView, $sd_th, $ed_th);
 
         return Excel::download($result, $excel_name);
+    }
+
+    /** ค่าใช้จ่ายภาษีรายงานประจำวัน = ยอดจ่าย+ค่าธรรมเนียม บิลรอรับป้าย/สำเร็จ ตามวันที่ยื่นภาษี (tax_renewal_date) */
+    private function sumCarTaxExpenseForDailyReport(?Carbon $startDate, ?Carbon $endDate, $branchId): float
+    {
+        if (! $startDate || ! $endDate) {
+            return 0.0;
+        }
+
+        $inspections = Inspections::query()
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereNull('deleted_at')
+            ->where('status', '!=', 'cancel')
+            ->whereHas('InspectionVehicles.vehicleServiceTransaction', fn ($q) => $q->where('service_id', 3))
+            ->whereHas('InspectionVehicles.vehicle', fn ($v) => $v->whereBetween('tax_renewal_date', [$startDate, $endDate]))
+            ->orderByDesc('id')
+            ->get();
+
+        $latestPerNo = $inspections
+            ->groupBy(function ($ins) {
+                $billNo = strtoupper(trim((string) ($ins->no ?? '')));
+
+                return $billNo !== '' ? 'no:' . $billNo : 'id:' . $ins->id;
+            })
+            ->map(fn ($group) => $group->sortByDesc('id')->first())
+            ->values()
+            ->filter(
+                fn ($ins) => in_array(
+                    strtolower(trim((string) ($ins->tax_vehicle ?? ''))),
+                    ['complete', 'success'],
+                    true
+                )
+            );
+
+        $total = 0.0;
+        foreach ($this->dedupeCarTaxExportsByLicensePlate($latestPerNo) as $ins) {
+            $total += (float) ($ins->paytrue ?? 0) + (float) ($ins->commission ?? 0);
+        }
+
+        return $total;
     }
 
     private function normalizeDailyReportPaidType(?string $paidType): ?string

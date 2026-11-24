@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class BranchesController extends Controller
 {
@@ -38,6 +39,51 @@ class BranchesController extends Controller
         }
     }
 
+    private function branchValidationRules(): array
+    {
+        return [
+            'name'            => 'required|string|max:255',
+            'business_name'   => 'required|string|max:255',
+            'phone'           => 'required|string|max:255',
+            'email'           => 'required|email|max:255',
+            'license_number'  => 'required|string|max:255',
+            'cal_com'         => 'required|in:all,only',
+            'address'         => 'required|string|max:500',
+            'tax_id'          => 'nullable|string|max:255',
+            'province_id'     => 'nullable|integer|exists:provinces,id',
+            'district_id'     => 'nullable|integer|exists:districts,id',
+            'subDistrict_id'  => 'nullable|integer|exists:sub_districts,id',
+        ];
+    }
+
+    private function fillBranchAttributes(Branches $item, Request $request): void
+    {
+        $item->name = $request->input('name');
+        $item->business_name = $request->input('business_name');
+        $item->phone = $request->input('phone');
+        $item->email = $request->input('email');
+        $item->province_id = $request->input('province_id');
+        $item->district_id = $request->input('district_id');
+        $item->subDistrict_id = $request->input('subDistrict_id');
+        $item->license_number = $request->input('license_number');
+        $item->postal_code = $request->input('postal_code');
+        $item->address = $request->input('address');
+        $item->tax_id = $request->input('tax_id');
+        $item->open_close_time = $request->input('open_close_time');
+        $item->open_date = $request->input('open_date');
+        $item->cal_com = $request->input('cal_com');
+        $item->approval_letter_number = $request->input('approval_letter_number');
+        $item->expiration_date = $request->input('expiration_date');
+        $item->book_number_ry_lpg = $request->input('book_number_ry_lpg');
+        $item->book_number_ks_lpg = $request->input('book_number_ks_lpg');
+        $item->book_number_ry_ngv = $request->input('book_number_ry_ngv');
+        $item->book_number_ks_ngv = $request->input('book_number_ks_ngv');
+        $item->expired_ry_lpg = $request->input('expired_ry_lpg');
+        $item->expired_ks_lpg = $request->input('expired_ks_lpg');
+        $item->expired_ry_ngv = $request->input('expired_ry_ngv');
+        $item->expired_ks_ngv = $request->input('expired_ks_ngv');
+    }
+
     public function store(Request $request)
     {
         $loginBy = Auth()->user();
@@ -45,26 +91,16 @@ class BranchesController extends Controller
             return $this->returnError('ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
         }
 
+        $validator = Validator::make($request->all(), $this->branchValidationRules());
+        if ($validator->fails()) {
+            return $this->returnBadRequest($validator->errors(), 'กรุณากรอกข้อมูลให้ครบถ้วน');
+        }
+
         DB::beginTransaction();
 
         try {
             $Item = new Branches;
-            $Item->name = $request->name;
-            $Item->business_name = $request->business_name;
-            $Item->phone = $request->phone;
-            $Item->email = $request->email;
-            $Item->province_id = $request->province_id;
-            $Item->district_id = $request->district_id;
-            $Item->subDistrict_id = $request->subDistrict_id;
-            $Item->license_number = $request->license_number;
-            $Item->postal_code = $request->postal_code;
-            $Item->address = $request->address;
-            $Item->tax_id = $request->tax_id;
-            $Item->open_close_time = $request->open_close_time;
-            $Item->open_date = $request->open_date;
-            $Item->cal_com = $request->cal_com;
-            $Item->approval_letter_number = $request->approval_letter_number;
-            $Item->expiration_date = $request->expiration_date;
+            $this->fillBranchAttributes($Item, $request);
             $Item->save();
 
             if ($request->hasFile('logo')) {
@@ -100,7 +136,7 @@ class BranchesController extends Controller
             // บันทึก log
             $userId = $loginBy->id;
             $type = 'เพิ่มรายการ';
-            $description = 'ผู้ใช้งาน ' . $loginBy->name . ' ได้ทำการ ' . $type . ' ' . $request->firstname;
+            $description = 'ผู้ใช้งาน ' . $loginBy->name . ' ได้ทำการ ' . $type . ' สาขา ' . ($Item->name ?? '');
             $this->Log($userId, $description, $type);
 
             return $this->returnSuccess('Success', $Item->fresh());
@@ -119,27 +155,19 @@ class BranchesController extends Controller
             return $this->returnError('ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
         }
 
+        $validator = Validator::make($request->all(), $this->branchValidationRules());
+        if ($validator->fails()) {
+            return $this->returnBadRequest($validator->errors(), 'กรุณากรอกข้อมูลให้ครบถ้วน');
+        }
+
         DB::beginTransaction();
 
         try {
             $item = Branches::where('id', $id)->first();
-            $item->name = $request->input('name');
-            $item->business_name = $request->input('business_name');
-            $item->phone = $request->input('phone');
-            $item->email = $request->input('email');
-            $item->license_number = $request->input('license_number');
-            $item->cal_com = $request->input('cal_com');
-            $item->subDistrict_id = $request->input('subDistrict_id');
-            $item->district_id = $request->input('district_id');
-            $item->province_id = $request->input('province_id');
-            $item->address = $request->input('address');
-            $item->postal_code = $request->input('postal_code');
-            $item->tax_id = $request->input('tax_id');
-            $item->open_close_time = $request->open_close_time;
-            $item->open_date = $request->open_date;
-            $item->cal_com = $request->cal_com;
-            $item->approval_letter_number = $request->approval_letter_number;
-            $item->expiration_date = $request->expiration_date;
+            if (!$item) {
+                return $this->returnErrorData('ไม่พบข้อมูลสาขา', 404);
+            }
+            $this->fillBranchAttributes($item, $request);
             $item->save();
 
             if ($request->hasFile('logo')) {
@@ -201,6 +229,8 @@ class BranchesController extends Controller
             if (!$Item) {
                 return $this->returnErrorData('ไม่พบข้อมูลที่ต้องการลบ',404);
             }
+            $branchName = $Item->name;
+            $branchId = $Item->id;
             $Item->delete();
 
             DB::commit();
@@ -208,7 +238,7 @@ class BranchesController extends Controller
             //log
             $userId = $loginBy->id;
             $type = 'ลบข้อมูล';
-            $description = 'ผู้ใช้งาน ' . $loginBy->name . ' ได้ทำการ ' . "id" . $type . $Item->$id;
+            $description = 'ผู้ใช้งาน ' . $loginBy->name . ' ได้ทำการ ' . $type . ' สาขา id ' . $branchId . ' (' . $branchName . ')';
             $this->Log($userId, $description, $type);
 
             return $this->returnUpdateReturnData('delete success', $Item);

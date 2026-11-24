@@ -4026,7 +4026,7 @@ class ReportToController extends Controller
         <thead>
             <table border="1" style="width:100%; border-collapse: collapse;">
                 <tr>
-                    <td colspan="9" style="border:1px solid #333; font-size: 22px; font-weight: bold;" align="center">
+                    <td colspan="10" style="border:1px solid #333; font-size: 22px; font-weight: bold;" align="center">
                         รายงาน พ.ร.บ. วันที่ ' . $startDate->format('d/m/') . (Carbon::parse($startDate)->year + 543)  . ' ถึง ' . $endDate->format('d/m/') . (Carbon::parse($startDate)->year + 543) . '
                     </td>
                 </tr>
@@ -4037,6 +4037,7 @@ class ReportToController extends Controller
                     <th>ทะเบียน</th>
                     <th>เบอร์โทร</th>
                     <th>ประกันภัย</th>
+                    <th>ราคา</th>
                     <th>วันที่เริ่มการคุ้มครอง</th>
                     <th>วันที่สิ้นสุดการคุ้มครอง</th>
                     <th>เลขกรรมธรรม์</th>
@@ -4053,6 +4054,7 @@ class ReportToController extends Controller
                 <td align="center">' . (empty($item->license_plate) ? '-' : $item->license_plate) . '</td>
                 <td align="center">' . (empty($item->customer_phone_number) ? '-' : $item->customer_phone_number) . '</td>
                 <td align="center">' . (empty($item->insurance_name) ? '-' : $item->insurance_name) . '</td>
+                <td align="right">' . (($item->amount_paid !== null && $item->amount_paid !== '') ? number_format((float) $item->amount_paid, 2) : '-') . '</td>
                 <td align="center">' . (empty($item->date_start) ? '-' : Carbon::parse($item->date_start)->format('d/m/') . (Carbon::parse($item->date)->year + 543))  . '</td>
                 <td align="center">' . (empty($item->date_end) ? '-' : Carbon::parse($item->date_end)->format('d/m/') . (Carbon::parse($item->date)->year + 543))  . '</td>
                 <td align="center">' . (empty($item->policy_number) ? '-' : $item->policy_number) . '</td>
@@ -4165,6 +4167,7 @@ class ReportToController extends Controller
             'insurances_renewals.date_end',
             'insurances_renewals.type',
             'insurances_renewals.amount_paid',
+            'vechicle_services_transactions.service_price',
             'insurances_renewals.policy_number',
             'insurances_renewals.policy_status',
             'insurances_renewals.insurance_renewal_type_id',
@@ -4256,7 +4259,7 @@ class ReportToController extends Controller
         <thead>
             <table border="1" style="width:100%; border-collapse: collapse;">
                 <tr>
-                    <td colspan="10" style="border:1px solid #333; font-size: 22px; font-weight: bold;" align="center">
+                    <td colspan="11" style="border:1px solid #333; font-size: 22px; font-weight: bold;" align="center">
                         รายงานประกัน วันที่ ' . ($startDate ? $startDate->format('d/m/') . ($startDate->year + 543) : '-') . ' ถึง ' . ($endDate ? $endDate->format('d/m/') . ($endDate->year + 543) : '-') . '
                     </td>
                 </tr>
@@ -4267,6 +4270,7 @@ class ReportToController extends Controller
                     <th>ทะเบียน</th>
                     <th>เบอร์โทร</th>
                     <th>ประกันภัย</th>
+                    <th>ราคา</th>
                     <th>วันที่เริ่มการคุ้มครอง</th>
                     <th>วันที่สิ้นสุดการคุ้มครอง</th>
                     <th>ประเภทประกันภัย</th>
@@ -4276,6 +4280,9 @@ class ReportToController extends Controller
                 <tbody>';
 
         foreach ($data as $index => $item) {
+            $price = ($item->amount_paid !== null && $item->amount_paid !== '')
+                ? $item->amount_paid
+                : ($item->service_price ?? null);
             $html .= '
             <tr>
                 <td align="center">' . ($index + 1) . '</td>
@@ -4284,6 +4291,7 @@ class ReportToController extends Controller
                 <td align="center">' . ($item->license_plate ?: '-') . '</td>
                 <td align="center">' . ($item->customer_phone_number ?: '-') . '</td>
                 <td align="center">' . ($item->name ?: '-') . '</td>
+                <td align="right">' . (($price !== null && $price !== '') ? number_format((float) $price, 2) : '-') . '</td>
                 <td align="center">' . ($item->date_start ? Carbon::parse($item->date_start)->format('d/m/') . (Carbon::parse($item->date_start)->year + 543) : '-') . '</td>
                 <td align="center">' . ($item->date_end ? Carbon::parse($item->date_end)->format('d/m/') . (Carbon::parse($item->date_end)->year + 543) : '-') . '</td>
                 <td align="center">' . ($item->insurance_renewal_type_name ?: '-') . '</td>

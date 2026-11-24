@@ -424,7 +424,9 @@ class InspectionsController extends Controller
                         $Insurances->insurance_names_id = $request->insurance_names_id; //บริษัทประกัน
                         $Insurances->date_start = $request->date_start; //วันที่เริ่มคุ้มครอง พรบ.
                         $Insurances->date_end = $request->date_end; //วันที่สิ้นสุด พรบ.
-                        $Insurances->amount_paid = $request->amount_paid; //เบี้ยพรบ
+                        $Insurances->amount_paid = $request->filled('amount_paid')
+                            ? $request->amount_paid
+                            : ($item['service_price'] ?? null);
                         $Insurances->insurance_renewal_type_id = $request->insurance_renewal_type_id; //ประเภท ป1 ป2
                         $Insurances->type = 'insurances';
                         $Insurances->save();
@@ -1100,7 +1102,9 @@ class InspectionsController extends Controller
                 $Insurances->insurance_names_id           = $request->insurance_names_id;
                 $Insurances->date_start                   = $request->date_start;
                 $Insurances->date_end                     = $request->date_end;
-                $Insurances->amount_paid                  = $request->amount_paid;
+                $Insurances->amount_paid                  = $request->filled('amount_paid')
+                    ? $request->amount_paid
+                    : $service_transaction->service_price;
                 $Insurances->insurance_renewal_type_id    = $request->insurance_renewal_type_id;
                 $Insurances->type                         = 'insurances';
                 $Insurances->save();
@@ -2187,12 +2191,19 @@ class InspectionsController extends Controller
             $weight = $request->weight;
             $cc = $request->cc;
             $regeister_date = Carbon::parse($request->regeister_date);
-            $tax_due_date = Carbon::parse($request->tax_due_date);
-            $tax_renewal_date = Carbon::parse($request->tax_renewal_date);
+            $tax_due_date = Carbon::parse($request->tax_due_date)->startOfDay();
+            $tax_renewal_date = Carbon::parse($request->tax_renewal_date)->startOfDay();
 
             $vehicle_inspection_types_id = $request->vehicle_inspection_types_id;
             $fuel_type = $request->fuel_type;
             $is_corporate = $request->is_corporate;
+
+            while (
+                $tax_renewal_date->lt($tax_due_date)
+                && $tax_renewal_date->diffInDays($tax_due_date) > VehicleTaxCalculator::EARLY_RENEWAL_DAYS
+            ) {
+                $tax_due_date = $tax_due_date->copy()->subYear();
+            }
 
             $calculator = new VehicleTaxCalculator();
             $periods = $calculator->buildTaxPeriods($tax_due_date, $tax_renewal_date);

@@ -41,6 +41,7 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
             'ทะเบียน',
             'เบอร์โทร',
             'ประกันภัย',
+            'ราคา',
             'วันที่เริ่มคุ้มครอง',
             'วันที่สิ้นสุดคุ้มครอง',
             'เลขกรมธรรม์',
@@ -65,6 +66,7 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
                 $r->license_plate ?: '-',
                 $r->customer_phone_number ?: '-',
                 $r->insurance_name ?: '-',
+                $this->formatMoney($r->amount_paid ?? null),
                 $dateStart ?: '-',
                 $dateEnd ?: '-',
                 $r->policy_number ?: '-',
@@ -73,7 +75,7 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
 
         // ถ้าไม่มีข้อมูล ให้แถวเปล่าเพื่อให้ไฟล์เปิดได้
         if (empty($rows)) {
-            $rows[] = array_fill(0, 9, '');
+            $rows[] = array_fill(0, 10, '');
         }
 
         return $rows;
@@ -86,12 +88,21 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
         return $d->format('d/m/') . ($d->year + 543);
     }
 
+    private function formatMoney($value): string
+    {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+
+        return number_format((float) $value, 2, '.', ',');
+    }
+
     public function columnFormats(): array
     {
         // นำเบอร์โทร/เลขกรมธรรม์เก็บเป็น "ข้อความ" ป้องกันศูนย์หาย
         return [
             'E' => NumberFormat::FORMAT_TEXT, // เบอร์โทร
-            'I' => NumberFormat::FORMAT_TEXT, // เลขกรมธรรม์
+            'J' => NumberFormat::FORMAT_TEXT, // เลขกรมธรรม์
         ];
     }
 
@@ -103,7 +114,7 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
 
                 // แทรกแถวหัวรายงานด้านบน
                 $sheet->insertNewRowBefore(1, 1);
-                $sheet->mergeCells('A1:I1');
+                $sheet->mergeCells('A1:J1');
 
                 // ข้อความหัวรายงาน (ใช้ปีของ start/end ตามจริง)
                 $title = 'รายงาน พ.ร.บ. วันที่ ';
@@ -121,12 +132,12 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
                 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
                 $sheet->getStyle('A1')->getAlignment()->setHorizontal('center');
 
-                $sheet->getStyle('A2:I2')->getFont()->setBold(true);
-                $sheet->getStyle('A2:I2')->getAlignment()->setHorizontal('center');
+                $sheet->getStyle('A2:J2')->getFont()->setBold(true);
+                $sheet->getStyle('A2:J2')->getAlignment()->setHorizontal('center');
 
                 // เส้นกรอบตารางทั้งหมด
                 $highestRow = $sheet->getHighestRow();
-                $sheet->getStyle("A2:I{$highestRow}")
+                $sheet->getStyle("A2:J{$highestRow}")
                       ->getBorders()->getAllBorders()
                       ->setBorderStyle(Border::BORDER_THIN);
 
@@ -135,8 +146,9 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
                 $sheet->getStyle("B3:B{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขบิล
                 $sheet->getStyle("C3:C{$highestRow}")->getAlignment()->setHorizontal('center'); // วันที่
                 $sheet->getStyle("D3:D{$highestRow}")->getAlignment()->setHorizontal('center'); // ทะเบียน
-                $sheet->getStyle("G3:H{$highestRow}")->getAlignment()->setHorizontal('center'); // ช่วงคุ้มครอง
-                $sheet->getStyle("I3:I{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขกรมธรรม์
+                $sheet->getStyle("G3:G{$highestRow}")->getAlignment()->setHorizontal('right'); // ราคา
+                $sheet->getStyle("H3:I{$highestRow}")->getAlignment()->setHorizontal('center'); // ช่วงคุ้มครอง
+                $sheet->getStyle("J3:J{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขกรมธรรม์
 
                 // Freeze header
                 $sheet->freezePane('A3');
@@ -145,7 +157,7 @@ class PrbReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithTi
                 $sheet->getColumnDimension('C')->setWidth(14); // วันที่
                 $sheet->getColumnDimension('E')->setWidth(16); // เบอร์โทร
                 $sheet->getColumnDimension('F')->setWidth(24); // ประกันภัย
-                $sheet->getColumnDimension('I')->setWidth(22); // เลขกรมธรรม์
+                $sheet->getColumnDimension('J')->setWidth(22); // เลขกรมธรรม์
             },
         ];
     }

@@ -41,6 +41,7 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
             'ทะเบียน',
             'เบอร์โทร',
             'ประกันภัย',
+            'ราคา',
             'วันที่เริ่มการคุ้มครอง',
             'วันที่สิ้นสุดการคุ้มครอง',
             'ประเภทประกันภัย',
@@ -61,6 +62,7 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
                 $r->license_plate ?: '-',
                 $r->customer_phone_number ?: '-',
                 ($r->name ?? '-') ?: '-', // insurance_names.name
+                $this->formatMoney($r->amount_paid ?? $r->service_price ?? null),
                 $this->thai($r->date_start) ?: '-',
                 $this->thai($r->date_end) ?: '-',
                 $r->insurance_renewal_type_name ?: '-',
@@ -69,7 +71,7 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
         }
 
         if (empty($out)) {
-            $out[] = array_fill(0, 10, '');
+            $out[] = array_fill(0, 11, '');
         }
 
         return $out;
@@ -82,12 +84,21 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
         return $d->format('d/m/') . ($d->year + 543);
     }
 
+    private function formatMoney($value): string
+    {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+
+        return number_format((float) $value, 2, '.', ',');
+    }
+
     public function columnFormats(): array
     {
         // เก็บเบอร์โทร/เลขกรมธรรม์เป็น "ข้อความ" กันศูนย์นำหน้า/เลขยาวเพี้ยน
         return [
             'E' => NumberFormat::FORMAT_TEXT, // เบอร์โทร
-            'J' => NumberFormat::FORMAT_TEXT, // เลขกรมธรรม์
+            'K' => NumberFormat::FORMAT_TEXT, // เลขกรมธรรม์
         ];
     }
 
@@ -99,7 +110,7 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
 
                 // แทรกหัวรายงานด้านบน + merge
                 $sheet->insertNewRowBefore(1, 1);
-                $sheet->mergeCells('A1:J1');
+                $sheet->mergeCells('A1:K1');
 
                 $title = 'รายงานประกัน วันที่ ';
                 $title .= $this->startDate
@@ -116,12 +127,12 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
                 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
                 $sheet->getStyle('A1')->getAlignment()->setHorizontal('center');
 
-                $sheet->getStyle('A2:J2')->getFont()->setBold(true);
-                $sheet->getStyle('A2:J2')->getAlignment()->setHorizontal('center');
+                $sheet->getStyle('A2:K2')->getFont()->setBold(true);
+                $sheet->getStyle('A2:K2')->getAlignment()->setHorizontal('center');
 
                 // เส้นกรอบตาราง (หัว + ข้อมูล)
                 $highestRow = $sheet->getHighestRow();
-                $sheet->getStyle("A2:J{$highestRow}")
+                $sheet->getStyle("A2:K{$highestRow}")
                       ->getBorders()->getAllBorders()
                       ->setBorderStyle(Border::BORDER_THIN);
 
@@ -130,9 +141,10 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
                 $sheet->getStyle("B3:B{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขบิล
                 $sheet->getStyle("C3:C{$highestRow}")->getAlignment()->setHorizontal('center'); // วันที่
                 $sheet->getStyle("D3:D{$highestRow}")->getAlignment()->setHorizontal('center'); // ทะเบียน
-                $sheet->getStyle("G3:H{$highestRow}")->getAlignment()->setHorizontal('center'); // ช่วงคุ้มครอง
-                $sheet->getStyle("I3:I{$highestRow}")->getAlignment()->setHorizontal('center'); // ประเภทประกัน
-                $sheet->getStyle("J3:J{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขกรมธรรม์
+                $sheet->getStyle("G3:G{$highestRow}")->getAlignment()->setHorizontal('right'); // ราคา
+                $sheet->getStyle("H3:I{$highestRow}")->getAlignment()->setHorizontal('center'); // ช่วงคุ้มครอง
+                $sheet->getStyle("J3:J{$highestRow}")->getAlignment()->setHorizontal('center'); // ประเภทประกัน
+                $sheet->getStyle("K3:K{$highestRow}")->getAlignment()->setHorizontal('center'); // เลขกรมธรรม์
 
                 // Freeze header
                 $sheet->freezePane('A3');
@@ -141,8 +153,8 @@ class InsurancesRenewalsReportExport implements FromArray, WithHeadings, ShouldA
                 $sheet->getColumnDimension('C')->setWidth(14);
                 $sheet->getColumnDimension('E')->setWidth(16);
                 $sheet->getColumnDimension('F')->setWidth(26);
-                $sheet->getColumnDimension('I')->setWidth(18);
-                $sheet->getColumnDimension('J')->setWidth(22);
+                $sheet->getColumnDimension('J')->setWidth(18);
+                $sheet->getColumnDimension('K')->setWidth(22);
             },
         ];
     }
